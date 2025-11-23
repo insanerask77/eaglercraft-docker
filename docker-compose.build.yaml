@@ -1,0 +1,14 @@
+services:
+  eaglercraft:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eaglercraft-server
+    ports:
+      - "5200:5200"
+      - "5201:5201"
+    volumes:
+      - ./world:/world               # Overworld data
+      - ./world_nether:/world_nether # Nether data
+      - ./world_the_end:/world_the_end # The End data
+    restart: unless-stopped
