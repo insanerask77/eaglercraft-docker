@@ -79,75 +79,86 @@ eaglercraft:
 nginx:
   config: |-
     events {
-        worker_connections 1024;
+    worker_connections 1024;
     }
 
     http {
         include /etc/nginx/mime.types;
         default_type application/octet-stream;
 
-        # Logging
         access_log /var/log/nginx/access.log;
-        error_log /var/log/nginx/error.log;
+        error_log /var/log/nginx/error.log debug;  # Cambia a debug temporalmente
 
-        # Performance
         sendfile on;
         tcp_nopush on;
         tcp_nodelay on;
         keepalive_timeout 65;
         types_hash_max_size 2048;
 
-        # Gzip compression
         gzip on;
         gzip_vary on;
         gzip_proxied any;
         gzip_comp_level 6;
         gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
 
-        # Use Kubernetes DNS resolver for dynamic service discovery
-        resolver kube-dns.kube-system.svc valid=10s;
+        # CORREGIR: Usar la IP del servicio DNS o el nombre correcto
+        resolver kube-dns.kube-system.svc valid=10s ipv6=off;
         resolver_timeout 5s;
 
-        # WebSocket connection upgrade mapping
         map $http_upgrade $connection_upgrade {
             default upgrade;
             '' close;
+        }
+
+        # Upstream blocks con health checks
+        upstream landing_page {
+            server {{ include "eaglercraft.landingPage.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:80 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        upstream eaglercraft_game {
+            server {{ include "eaglercraft.eaglercraft.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:5200 max_fails=3 fail_timeout=30s;
+            keepalive 32;
         }
 
         server {
             listen 80;
             server_name _;
 
-            # Landing page - root path
-            location / {
-                set $landing_page {{ include "eaglercraft.landingPage.fullname" . }}.{{ .Release.Namespace }}.svc;
-                proxy_pass http://$landing_page:80;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
+            location /healthz {
+                access_log off;
+                return 200 "OK\n";
+                add_header Content-Type text/plain;
             }
 
-            # Game - direct access with WebSocket support
-            location /game/ {
-                set $eaglercraft_game {{ include "eaglercraft.eaglercraft.fullname" . }}.{{ .Release.Namespace }}.svc;
-                proxy_pass http://$eaglercraft_game:5200/;
+            location / {
+                proxy_pass http://landing_page;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $scheme;
                 
-                # WebSocket support - CRITICAL for Eaglercraft
+                proxy_connect_timeout 10s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+                
+                proxy_next_upstream error timeout http_502 http_503 http_504;
+            }
+
+            location /game/ {
+                proxy_pass http://eaglercraft_game/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+
                 proxy_http_version 1.1;
                 proxy_set_header Upgrade $http_upgrade;
                 proxy_set_header Connection $connection_upgrade;
-                
-                # Timeouts for WebSocket
-                proxy_connect_timeout 7d;
+
+                proxy_connect_timeout 60s;
                 proxy_send_timeout 7d;
                 proxy_read_timeout 7d;
-                
-                # Buffering
                 proxy_buffering off;
             }
         }

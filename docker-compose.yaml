@@ -30,9 +30,9 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./world:/world # Overworld data
-      - ./world_nether:/world_nether # Nether data
-      - ./world_the_end:/world_the_end # The End data
+      - world:/world # Overworld data
+      - world_nether:/world_nether # Nether data
+      - world_the_end:/world_the_end # The End data
     restart: unless-stopped
     networks:
       - eaglercraft-network
@@ -40,3 +40,9 @@ services:
 networks:
   eaglercraft-network:
     driver: bridge
+
+volumes:
+  world:
+  world_nether:
+  world_the_end:
+
