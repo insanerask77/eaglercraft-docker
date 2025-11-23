@@ -1,12 +1,48 @@
 services:
-  eaglercraft:
-    image: minecraft # ghcr.io/yangchuansheng/eaglerx1.8server:1.12.1
-    container_name: eaglercraft-server
+  # Unified Nginx Proxy - Main Entry Point
+  nginx-proxy:
+    image: registry.easypanel.madolell.com/eaglercraft/proxy
+    build: ./nginx-proxy
+    container_name: eaglercraft-proxy
     ports:
-      - "5200:5200"
-      - "5201:5201"
-    volumes:
-      - ./world:/world               # Overworld data
-      - ./world_nether:/world_nether # Nether data
-      - ./world_the_end:/world_the_end # The End data
+      - "80:80"
+    depends_on:
+      - landing-page
+      - eaglercraft
     restart: unless-stopped
+    networks:
+      - eaglercraft-network
+
+  # Landing Page (Internal Only)
+  landing-page:
+    image: registry.easypanel.madolell.com/eaglercraft/landing-page
+    build: ./landing-page
+    container_name: eaglercraft-landing
+    restart: unless-stopped
+    networks:
+      - eaglercraft-network
+
+  # Eaglercraft Game Server (Internal Only)
+  eaglercraft:
+    image: registry.easypanel.madolell.com/eaglercraft/server
+    container_name: eaglercraft-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - world:/world # Overworld data
+      - world_nether:/world_nether # Nether data
+      - world_the_end:/world_the_end # The End data
+    restart: unless-stopped
+    networks:
+      - eaglercraft-network
+
+networks:
+  eaglercraft-network:
+    driver: bridge
+
+volumes:
+  world:
+  world_nether:
+  world_the_end:
+

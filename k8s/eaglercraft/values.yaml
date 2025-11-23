@@ -1,0 +1,165 @@
+# Default values for eaglercraft Helm chart
+
+# Global Configuration
+global:
+  # Image registry configuration
+  imageRegistry: registry.easypanel.madolell.com
+
+  # Image pull secrets for private registry
+  # Create the secret with:
+  # kubectl create secret docker-registry docker-registry \
+  #   --docker-server=registry.easypanel.madolell.com \
+  #   --docker-username=<your-username> \
+  #   --docker-password=<your-password> \
+  #   --docker-email=<your-email>
+  imagePullSecrets:
+    - name: docker-registry
+
+# Nginx Proxy Configuration
+nginxProxy:
+  image:
+    repository: nginx
+    tag: alpine
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Landing Page Configuration
+landingPage:
+  image:
+    repository: registry.easypanel.madolell.com/eaglercraft/landing-page
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    port: 80
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Eaglercraft Game Server Configuration
+eaglercraft:
+  image:
+    repository: registry.easypanel.madolell.com/eaglercraft/server
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    port1: 5200
+    port2: 5201
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  persistence:
+    enabled: true
+    storageClass: "local-path"
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    # If you want to use existing PVCs, specify them here
+    existingClaim: ""
+
+# Nginx Configuration
+nginx:
+  config: |-
+    events {
+    worker_connections 1024;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log debug;  # Cambia a debug temporalmente
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
+
+        # CORREGIR: Usar la IP del servicio DNS o el nombre correcto
+        resolver kube-dns.kube-system.svc valid=10s ipv6=off;
+        resolver_timeout 5s;
+
+        map $http_upgrade $connection_upgrade {
+            default upgrade;
+            '' close;
+        }
+
+        # Upstream blocks con health checks
+        upstream landing_page {
+            server {{ include "eaglercraft.landingPage.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:80 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        upstream eaglercraft_game {
+            server {{ include "eaglercraft.eaglercraft.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:5200 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        server {
+            listen 80;
+            server_name _;
+
+            location /healthz {
+                access_log off;
+                return 200 "OK\n";
+                add_header Content-Type text/plain;
+            }
+
+            location / {
+                proxy_pass http://landing_page;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_connect_timeout 10s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+                
+                proxy_next_upstream error timeout http_502 http_503 http_504;
+            }
+
+            location /game/ {
+                proxy_pass http://eaglercraft_game/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 7d;
+                proxy_read_timeout 7d;
+                proxy_buffering off;
+            }
+        }
+    }
