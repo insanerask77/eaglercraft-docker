@@ -1,0 +1,12 @@
+landing-page
+nginx-proxy
+docker-compose.yaml
+Dockerfile
+Dockerfile.base
+README.md
+.gitignore
+.git
+world
+world_nether
+world_the_end
+
