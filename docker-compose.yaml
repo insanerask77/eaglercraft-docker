@@ -1,6 +1,7 @@
 services:
   # Unified Nginx Proxy - Main Entry Point
   nginx-proxy:
+    image: registry.easypanel.madolell.com/eaglercraft/proxy
     build: ./nginx-proxy
     container_name: eaglercraft-proxy
     ports:
@@ -14,6 +15,7 @@ services:
 
   # Landing Page (Internal Only)
   landing-page:
+    image: registry.easypanel.madolell.com/eaglercraft/landing-page
     build: ./landing-page
     container_name: eaglercraft-landing
     restart: unless-stopped
@@ -22,16 +24,16 @@ services:
 
   # Eaglercraft Game Server (Internal Only)
   eaglercraft:
-    image: minecraft # ghcr.io/yangchuansheng/eaglerx1.8server:1.12.1
+    image: registry.easypanel.madolell.com/eaglercraft/server
     container_name: eaglercraft-server
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
       - ./world:/world # Overworld data
       - ./world_nether:/world_nether # Nether data
       - ./world_the_end:/world_the_end # The End data
     restart: unless-stopped
-    ports:
-      - "5200:5200"
-      - "5201:5201"
     networks:
       - eaglercraft-network
 

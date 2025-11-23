@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eaglercraft.eaglercraft.fullname" . }}
+  labels:
+    {{- include "eaglercraft.eaglercraft.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.eaglercraft.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eaglercraft.eaglercraft.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eaglercraft.eaglercraft.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: eaglercraft
+        image: "{{ .Values.eaglercraft.image.repository }}:{{ .Values.eaglercraft.image.tag }}"
+        imagePullPolicy: {{ .Values.eaglercraft.image.pullPolicy }}
+        ports:
+        - name: game-port1
+          containerPort: {{ .Values.eaglercraft.service.port1 }}
+          protocol: TCP
+        - name: game-port2
+          containerPort: {{ .Values.eaglercraft.service.port2 }}
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.eaglercraft.resources | nindent 10 }}
+        {{- if .Values.eaglercraft.persistence.enabled }}
+        volumeMounts:
+        - name: world-data
+          mountPath: /world
+          subPath: world
+        - name: world-data
+          mountPath: /world_nether
+          subPath: world_nether
+        - name: world-data
+          mountPath: /world_the_end
+          subPath: world_the_end
+        {{- end }}
+      {{- if .Values.eaglercraft.persistence.enabled }}
+      volumes:
+      - name: world-data
+        persistentVolumeClaim:
+          claimName: {{ .Values.eaglercraft.persistence.existingClaim | default (printf "%s-data" (include "eaglercraft.eaglercraft.fullname" .)) }}
+      {{- end }}

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eaglercraft.landingPage.fullname" . }}
+  labels:
+    {{- include "eaglercraft.landingPage.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.landingPage.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eaglercraft.landingPage.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eaglercraft.landingPage.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: landing-page
+        image: "{{ .Values.landingPage.image.repository }}:{{ .Values.landingPage.image.tag }}"
+        imagePullPolicy: {{ .Values.landingPage.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.landingPage.resources | nindent 10 }}

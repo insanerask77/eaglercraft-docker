@@ -1,0 +1,13 @@
+apiVersion: v2
+name: eaglercraft
+description: A Helm chart for deploying Eaglercraft with Nginx proxy and landing page
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - eaglercraft
+  - minecraft
+  - game
+maintainers:
+  - name: Rafa Madolell
+    url: https://github.com/insanerask77

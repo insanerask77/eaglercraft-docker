@@ -1,0 +1,17 @@
+{{- if and .Values.eaglercraft.persistence.enabled (not .Values.eaglercraft.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "eaglercraft.eaglercraft.fullname" . }}-data
+  labels:
+    {{- include "eaglercraft.eaglercraft.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.eaglercraft.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.eaglercraft.persistence.size }}
+  {{- if .Values.eaglercraft.persistence.storageClass }}
+  storageClassName: {{ .Values.eaglercraft.persistence.storageClass }}
+  {{- end }}
+{{- end }}

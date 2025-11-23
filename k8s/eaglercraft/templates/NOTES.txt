@@ -1,0 +1,29 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your Eaglercraft deployment is ready!
+
+1. Get the application URL by running these commands:
+{{- if eq .Values.nginxProxy.service.type "NodePort" }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "eaglercraft.nginxProxy.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "Visit http://$NODE_IP:$NODE_PORT to access Eaglercraft"
+{{- else if eq .Values.nginxProxy.service.type "LoadBalancer" }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "eaglercraft.nginxProxy.fullname" . }}'
+  
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "eaglercraft.nginxProxy.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo "Visit http://$SERVICE_IP to access Eaglercraft"
+{{- else if eq .Values.nginxProxy.service.type "ClusterIP" }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "eaglercraft.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=nginx-proxy" -o jsonpath="{.items[0].metadata.name}")
+  echo "Visit http://127.0.0.1:8080 to access Eaglercraft"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:80
+{{- end }}
+
+2. Application endpoints:
+   - Landing Page: http://<SERVICE_IP>/
+   - Game: http://<SERVICE_IP>/game/
+
+3. Check the status of your deployment:
+   kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}"
+
+For more information, visit: https://github.com/insanerask77/eaglercraft-docker
