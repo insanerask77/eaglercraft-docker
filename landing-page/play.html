@@ -122,6 +122,17 @@
             overflow: hidden;
         }
 
+        .game-wrapper.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            padding-bottom: 0;
+            z-index: 9999;
+            border-radius: 0;
+        }
+
         .game-frame {
             position: absolute;
             top: 0;
@@ -129,6 +140,7 @@
             width: 100%;
             height: 100%;
             border: none;
+            outline: none;
         }
 
         /* Controls Section */
@@ -288,7 +300,7 @@
         <!-- Game Container -->
         <div class="game-container">
             <div class="game-wrapper">
-                <iframe class="game-frame" src="/game/" allowfullscreen></iframe>
+                <iframe id="gameFrame" class="game-frame" src="/game/" allowfullscreen tabindex="0"></iframe>
             </div>
         </div>
 
@@ -420,65 +432,131 @@
     </div>
 
     <script>
+        // Get references to elements
+        const gameFrame = document.getElementById('gameFrame');
+        const gameWrapper = document.querySelector('.game-wrapper');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const fullscreenIcon = document.getElementById('fullscreenIcon');
+        const fullscreenText = document.getElementById('fullscreenText');
+        
+        let isFullscreen = false;
+
+        // Auto-focus iframe when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                gameFrame.focus();
+            }, 500);
+        });
+
+        // Focus iframe when clicked
+        gameWrapper.addEventListener('click', () => {
+            gameFrame.focus();
+        });
+
         // Fullscreen functionality
         function toggleFullscreen() {
-            const elem = document.documentElement;
-            const btn = document.getElementById('fullscreenBtn');
-            const icon = document.getElementById('fullscreenIcon');
-            const text = document.getElementById('fullscreenText');
+            isFullscreen = !isFullscreen;
             
-            if (!document.fullscreenElement) {
+            if (isFullscreen) {
                 // Enter fullscreen
-                if (elem.requestFullscreen) {
-                    elem.requestFullscreen();
-                } else if (elem.webkitRequestFullscreen) {
-                    elem.webkitRequestFullscreen();
-                } else if (elem.msRequestFullscreen) {
-                    elem.msRequestFullscreen();
+                gameWrapper.classList.add('fullscreen');
+                document.body.style.overflow = 'hidden';
+                updateFullscreenButton(true);
+                
+                // Try to use Fullscreen API as well for better experience
+                if (gameWrapper.requestFullscreen) {
+                    gameWrapper.requestFullscreen().catch(err => {
+                        console.log('Fullscreen API not available, using CSS fallback');
+                    });
+                } else if (gameWrapper.webkitRequestFullscreen) {
+                    gameWrapper.webkitRequestFullscreen();
+                } else if (gameWrapper.msRequestFullscreen) {
+                    gameWrapper.msRequestFullscreen();
                 }
             } else {
                 // Exit fullscreen
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) {
-                    document.msExitFullscreen();
+                gameWrapper.classList.remove('fullscreen');
+                document.body.style.overflow = '';
+                updateFullscreenButton(false);
+                
+                // Exit Fullscreen API if active
+                if (document.fullscreenElement) {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
                 }
             }
+            
+            // Refocus iframe after fullscreen toggle
+            setTimeout(() => {
+                gameFrame.focus();
+            }, 100);
         }
 
         // Update button icon when fullscreen state changes
-        document.addEventListener('fullscreenchange', updateFullscreenButton);
-        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
-        document.addEventListener('msfullscreenchange', updateFullscreenButton);
-
-        function updateFullscreenButton() {
-            const icon = document.getElementById('fullscreenIcon');
-            const text = document.getElementById('fullscreenText');
-            
-            if (document.fullscreenElement) {
+        function updateFullscreenButton(inFullscreen) {
+            if (inFullscreen) {
                 // In fullscreen - show exit icon
-                icon.innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
-                text.textContent = 'Exit Fullscreen';
+                fullscreenIcon.innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
+                fullscreenText.textContent = 'Exit Fullscreen';
             } else {
                 // Not in fullscreen - show enter icon
-                icon.innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
-                text.textContent = 'Fullscreen';
+                fullscreenIcon.innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+                fullscreenText.textContent = 'Fullscreen';
             }
         }
 
-        // Keyboard shortcut for fullscreen (F11 or F)
+        // Listen for Fullscreen API changes (in case user presses ESC)
+        document.addEventListener('fullscreenchange', handleFullscreenAPIChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenAPIChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenAPIChange);
+
+        function handleFullscreenAPIChange() {
+            const isInFullscreenAPI = !!(document.fullscreenElement || 
+                                         document.webkitFullscreenElement || 
+                                         document.msFullscreenElement);
+            
+            if (!isInFullscreenAPI && isFullscreen) {
+                // User exited fullscreen via ESC key
+                isFullscreen = false;
+                gameWrapper.classList.remove('fullscreen');
+                document.body.style.overflow = '';
+                updateFullscreenButton(false);
+            }
+        }
+
+        // Fullscreen button click
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        // Keyboard shortcut for fullscreen (F11)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F11') {
                 e.preventDefault();
                 toggleFullscreen();
+            }
+            
+            // ESC to exit fullscreen
+            if (e.key === 'Escape' && isFullscreen) {
+                toggleFullscreen();
+            }
+        });
+
+        // Prevent iframe from losing focus when clicking outside
+        document.addEventListener('click', (e) => {
+            // If click is not on a button or link, refocus the iframe
+            if (!e.target.closest('button') && !e.target.closest('a')) {
+                gameFrame.focus();
             }
         });
 
         console.log('%c🎮 Eaglercraft Game View 🎮', 'font-size: 20px; color: #4ade80; font-weight: bold;');
         console.log('%cControls are displayed below the game', 'font-size: 14px; color: #9ca3af;');
         console.log('%cPress the Fullscreen button or F11 to toggle fullscreen', 'font-size: 14px; color: #9ca3af;');
+        console.log('%cClick on the game to ensure keyboard focus', 'font-size: 14px; color: #fbbf24;');
     </script>
 </body>
 </html>
